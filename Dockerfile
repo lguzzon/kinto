@@ -19,6 +19,7 @@ RUN \
     kinto --ini $KINTO_INI --backend=memory init; \
     apt-get remove -y -qq build-essential git python3-dev libssl-dev libffi-dev libpq-dev; \
     apt-get autoremove -y -qq; \
+    apt-get autoclean -y; \
     apt-get clean -y
 
 # Run database migrations and start the kinto server
