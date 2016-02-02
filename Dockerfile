@@ -1,6 +1,6 @@
 # Mozilla Kinto server
-FROM debian:sid
-MAINTAINER Storage Team irc://irc.freenode.net/#kinto
+FROM armbuild/debian:latest
+MAINTAINER Luca Guzzon (porting to scaleway)
 
 ADD . /code
 ENV KINTO_INI /etc/kinto/kinto.ini
@@ -9,6 +9,7 @@ ENV KINTO_INI /etc/kinto/kinto.ini
 # dependencies all at once to build a small image.
 RUN \
     apt-get update; \
+    apt-get install -y apt-utils; \
     apt-get install -y python3 python3-setuptools libpq5; \
     apt-get install -y build-essential git python3-dev libssl-dev libffi-dev libpq-dev; \
     easy_install3 pip; \
