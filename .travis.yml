@@ -1,32 +1,38 @@
+dist: trusty
 language: python
-python: 2.7
-services: redis-server
+python: 3.5
+cache: pip
 addons:
-  postgresql: "9.4"
+  postgresql: "9.5"
 env:
-    - TOX_ENV=py27
-    - TOX_ENV=py34
-    #- TOX_ENV=py35
-    - TOX_ENV=pypy
-    - TOX_ENV=cliquet-master
-    - TOX_ENV=flake8
-    - TOX_ENV=docs
-    - ACTION=loadtest_tutorial
-    - ACTION=loadtest_simulation
+  - TOX_ENV=py35
+  - TOX_ENV=py35-raw
+  - TOX_ENV=flake8
+  - TOX_ENV=docs
+install:
+  - pip install tox
+before_script:
+  - echo "Pull request ${TRAVIS_PULL_REQUEST}"
+  - sudo sed -i "s/fsync/#fsync/" /etc/postgresql/9.5/main/postgresql.conf
+  - sudo /etc/init.d/postgresql restart
+  - psql -c "CREATE DATABASE testdb ENCODING 'UTF8' TEMPLATE template0;" -U postgres
+  - make version-file
+script:
+  - tox -e $TOX_ENV
+after_success:
+  # Report coverage results to coveralls.io
+  - pip install coveralls
+  - coveralls
+
 matrix:
   include:
-    - python: 3.5
+    - python: 3.6
       env:
-        - TOX_ENV=py35
-before_script:
-    - psql -c "CREATE DATABASE testdb ENCODING 'UTF8' TEMPLATE template0;" -U postgres
-install:
-    - if [[ $ACTION != loadtest_tutorial && $ACTION != loadtest_simulation ]]; then pip install tox; fi
-script:
-    - if [[ $ACTION != loadtest_tutorial && $ACTION != loadtest_simulation ]]; then tox -e $TOX_ENV; fi
-    - if [[ $ACTION == loadtest_simulation ]]; then make loadtest-check-simulation; fi
-    - if [[ $ACTION == loadtest_tutorial ]]; then make loadtest-check-tutorial; fi
-after_success:
-    # Report coverage results to coveralls.io
-    - pip install coveralls
-    - coveralls
+        - TOX_ENV=py36
+    - env: ENV=functional
+      before_install:
+        - make install-dev
+        - make install-postgres
+      script:
+        - make runkinto & sleep 5
+        - make functional

@@ -7,7 +7,10 @@ A bucket is the parent object of collections and groups.
 
 A bucket is a mapping with the following attributes:
 
-* ``permissions``: (*optional*) the :term:`ACLs <ACL>` for the bucket object
+* ``data``: (*optional*) attributes of the bucket object
+    * ``id``: the bucket object id
+    * ``last_modified``: the timestamp of the last modification
+* ``permissions``: the :term:`ACLs <ACL>` for the bucket object
 
 
 .. _buckets-post:
@@ -69,6 +72,13 @@ Creating a bucket
             }
         }
 
+A bucket also accept arbitrary attributes.
+For example, you may want to store some application settings there.
+
+.. include:: _details-post-list.rst
+
+.. include:: _status-post-list.rst
+
 
 .. _bucket-put:
 
@@ -82,7 +92,7 @@ Replacing a bucket
     **Requires authentication**
 
     If the bucket exists but you don't have the ``write`` permission,
-    you will get a ``403 Forbidden`` http response.
+    you will get a |status-403| http response.
 
     **Example request**
 
@@ -124,11 +134,9 @@ Replacing a bucket
             }
         }
 
-    .. note::
+.. include:: _details-put-object.rst
 
-        In order to create only if it does not exist yet, a ``If-None-Match: *``
-        request header can be provided. A ``412 Precondition Failed`` error response
-        will be returned if the record already exists.
+.. include:: _status-put-object.rst
 
 
 .. _bucket-get:
@@ -185,6 +193,10 @@ Retrieve an existing bucket
             }
         }
 
+.. include:: _details-get-object.rst
+
+.. include:: _status-get-object.rst
+
 
 .. _bucket-patch:
 
@@ -197,10 +209,9 @@ Updating an existing bucket
 
     **Requires authentication**
 
-    .. note::
+.. include:: _details-patch-object.rst
 
-        Until a formalism is found to alter ACL principals (e.g. using ``+`` or ``-``)
-        there is no difference in the behaviour between PATCH and PUT.
+.. include:: _status-patch-object.rst
 
 
 .. _bucket-delete:
@@ -249,6 +260,10 @@ Deleting a bucket
                 "last_modified": 1434641382954
             }
         }
+
+.. include:: _details-delete-object.rst
+
+.. include:: _status-delete-object.rst
 
 
 .. _buckets-get:
@@ -301,11 +316,71 @@ Retrieving all buckets
             ]
         }
 
+.. include:: _details-get-list.rst
+
+.. include:: _status-get-list.rst
+
+
+.. _buckets-delete:
+
+Delete all buckets
+=======================
+
+.. http:delete:: /buckets
+
+    :synopsis: Delete every writable buckets for this user
+
+    **Requires authentication**
+
+    **Example Request**
+
+    .. sourcecode:: bash
+
+        $ http delete http://localhost:8888/v1/buckets --auth="token:bob-token" --verbose
+
+    .. sourcecode:: http
+
+        DELETE /v1/buckets HTTP/1.1
+        Accept: */*
+        Accept-Encoding: gzip, deflate
+        Authorization: Basic YWxpY2U6
+        Connection: keep-alive
+        Content-Length: 0
+        Host: localhost:8888
+        User-Agent: HTTPie/0.9.2
+
+    **Example Response**
+
+    .. sourcecode:: http
+
+        HTTP/1.1 200 OK
+        Access-Control-Expose-Headers: Retry-After, Content-Length, Alert, Backoff
+        Content-Length: 101
+        Content-Type: application/json; charset=UTF-8
+        Date: Fri, 26 Feb 2016 14:12:22 GMT
+        Server: waitress
+
+        {
+            "data": [
+                {
+                    "deleted": true,
+                    "id": "e64db3f9-6a60-1acf-fc3a-7d1ba7e823aa",
+                    "last_modified": 1456495942515
+                }
+            ]
+        }
+
+.. include:: _details-delete-list.rst
+
+.. include:: _status-delete-list.rst
+
 
 .. _buckets-default-id:
 
 Personal bucket «default»
 =========================
+
+When the built-in plugin ``kinto.plugins.default_bucket`` is enabled in configuration, a bucket ``default`` is available.
 
 As explained in the :ref:`section about collections<collections>`, the ``default``
 bucket implicitly creates the collections objects on their first use.
@@ -390,10 +465,9 @@ For convenience, the actual default bucket id is provided in the root URL of *Ki
             "hello": "kinto",
             "version": "1.7.0.dev0"
             "url": "http://localhost:8888/v1/",
-            "documentation": "https://kinto.readthedocs.org/",
+            "documentation": "https://kinto.readthedocs.io/",
             "settings": {
                 "batch_max_requests": 25,
-                "cliquet.batch_max_requests": 25
             },
             "user": {
                 "id": "basicauth:62e79bedacd2508c7da3dfb16e9724501fb4bdf9a830de7f8abcc8f7f1496c35",

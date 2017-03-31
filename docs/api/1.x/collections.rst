@@ -5,28 +5,163 @@ Collections
 
 A collection belongs to a bucket and stores records.
 
-A collection is a mapping with the following attribute:
+A collection is a mapping with the following attributes:
 
-* ``schema``: (*optional*) a JSON schema to validate the collection records
-* ``cache_expires``: (*optional*, in seconds) add client cache headers on read-only requests.
-  :ref:`More details...<collection-caching>`
+* ``data``: (*optional*) attributes of the collection object
+    * ``id``: the collection object id
+    * ``last_modified``: the timestamp of the last modification
+    * ``schema``: (*optional*) a JSON schema to validate the collection records
+    * ``cache_expires``: (*optional*, in seconds) add client cache headers on   read-only requests.
+      :ref:`More details...<collection-caching>`
+    * and any field you might need
+* ``permissions``: the :term:`ACLs <ACL>` for the collection object
 
 
 .. note::
 
-    By default users are assigned to a bucket that is used for their
-    personal data. When going through the default bucket, the collections are created
-    silently upon first access
 
-    Application can use this default bucket with the ``default``
-    shortcut: ie ``/buckets/default/collections/contacts`` will be
-    the current user contacts.
+    When the built-in plugin ``kinto.plugins.default_bucket`` is enabled in
+    configuration, a bucket ``default`` is available.
+
+    Users are assigned to that bucket which can be used for their personal data.
+
+    When going through the ``default`` bucket, the collections are created
+    silently upon first access.
+
+    Applications can use this default bucket (e.g. ``/buckets/default/collections/contacts`` will be
+    the contacts of the current user.
 
     Internally the user default bucket is assigned to an ID, and users can share
     data from their personnal bucket, by sharing :ref:`its URL using the full ID <buckets-default-id>`.
 
 
-.. _collection-post:
+.. _collections-get:
+
+List bucket collections
+=======================
+
+.. http:get:: /buckets/(bucket_id)/collections
+
+   :synopsis: List bucket's readable collections
+
+   **Requires authentication**
+
+   **Example Request**
+
+   .. sourcecode:: bash
+
+      $ http GET http://localhost:8888/v1/buckets/blog/collections --auth="token:bob-token" --verbose
+
+   .. sourcecode:: http
+
+      GET /v1/buckets/blog/collections HTTP/1.1
+      Accept: */*
+      Accept-Encoding: gzip, deflate
+      Authorization: Basic YWxpY2U6
+      Connection: keep-alive
+      Host: localhost:8888
+      User-Agent: HTTPie/0.9.2
+
+   .. sourcecode:: http
+
+      HTTP/1.1 200 OK
+      Access-Control-Expose-Headers: Content-Length, Expires, Alert, Retry-After, Last-Modified, Total-Records, ETag, Pragma, Cache-Control, Backoff, Next-Page
+      Cache-Control: no-cache
+      Content-Length: 144
+      Content-Type: application/json; charset=UTF-8
+      Date: Fri, 26 Feb 2016 14:14:40 GMT
+      Etag: "1456496072475"
+      Last-Modified: Fri, 26 Feb 2016 14:14:32 GMT
+      Server: waitress
+      Total-Records: 3
+
+      {
+          "data": [
+              {
+                  "id": "scores",
+                  "last_modified": 1456496072475
+              },
+              {
+                  "id": "game",
+                  "last_modified": 1456496060675
+              },
+              {
+                  "id": "articles",
+                  "last_modified": 1456496056908
+              }
+          ]
+      }
+
+.. include:: _details-get-list.rst
+
+.. include:: _status-get-list.rst
+
+
+.. _collections-delete:
+
+Delete bucket collections
+=========================
+
+.. http:delete:: /buckets/(bucket_id)/collections
+
+    :synopsis: Delete every writable collections in this bucket
+
+    **Requires authentication**
+
+    **Example Request**
+
+    .. sourcecode:: bash
+
+        $ http delete http://localhost:8888/v1/buckets/blog/collections --auth="token:bob-token" --verbose
+
+    .. sourcecode:: http
+
+        DELETE /v1/buckets/blog/collections HTTP/1.1
+        Accept: */*
+        Accept-Encoding: gzip, deflate
+        Authorization: Basic YWxpY2U6
+        Connection: keep-alive
+        Content-Length: 0
+        Host: localhost:8888
+        User-Agent: HTTPie/0.9.2
+
+    **Example Response**
+
+    .. sourcecode:: http
+
+        HTTP/1.1 200 OK
+        Access-Control-Expose-Headers: Retry-After, Content-Length, Alert, Backoff
+        Content-Length: 189
+        Content-Type: application/json; charset=UTF-8
+        Date: Fri, 26 Feb 2016 14:19:21 GMT
+        Server: waitress
+
+        {
+            "data": [
+                {
+                    "deleted": true,
+                    "id": "articles",
+                    "last_modified": 1456496361303
+                },
+                {
+                    "deleted": true,
+                    "id": "game",
+                    "last_modified": 1456496361304
+                },
+                {
+                    "deleted": true,
+                    "id": "scores",
+                    "last_modified": 1456496361305
+                }
+            ]
+        }
+
+.. include:: _details-delete-list.rst
+
+.. include:: _status-delete-list.rst
+
+
+.. _collections-post:
 
 Creating a collection
 =====================
@@ -82,6 +217,9 @@ Creating a collection
           }
       }
 
+.. include:: _details-post-list.rst
+
+.. include:: _status-post-list.rst
 
 
 .. _collection-put:
@@ -136,11 +274,9 @@ Replacing a collection
             }
         }
 
-    .. note::
+.. include:: _details-put-object.rst
 
-        In order to create only if it does not exist yet, a ``If-None-Match: *``
-        request header can be provided. A ``412 Precondition Failed`` error response
-        will be returned if the record already exists.
+.. include:: _status-put-object.rst
 
 
 .. _collection-patch:
@@ -204,6 +340,10 @@ Updating a collection
             }
         }
 
+.. include:: _details-patch-object.rst
+
+.. include:: _status-patch-object.rst
+
 
 .. _collection-get:
 
@@ -258,6 +398,10 @@ Retrieving an existing collection
             }
         }
 
+.. include:: _details-get-object.rst
+
+.. include:: _status-get-object.rst
+
 
 .. _collection-delete:
 
@@ -306,6 +450,10 @@ Deleting a collection
             }
         }
 
+.. include:: _details-delete-object.rst
+
+.. include:: _status-delete-object.rst
+
 
 .. _collection-json-schema:
 
@@ -319,7 +467,7 @@ collection.
 
 Once a schema is set, records will be validated during creation or update.
 
-If the validation fails, a ``400 Bad Request`` error response will be
+If the validation fails, a |status-400| error response will be
 returned.
 
 .. note::
@@ -350,11 +498,11 @@ Just modify the ``schema`` attribute of the collection object:
           "required": ["title"]
         }
       }
-    }' | http PATCH "http://localhost:8888/v1/buckets/default/collections/articles" --auth token:admin-token --verbose
+    }' | http PATCH "http://localhost:8888/v1/buckets/blog/collections/articles" --auth token:admin-token --verbose
 
 .. code-block:: http
 
-    PATCH /v1/buckets/default/collections/articles HTTP/1.1
+    PATCH /v1/buckets/blog/collections/articles HTTP/1.1
     Accept: application/json
     Accept-Encoding: gzip, deflate
     Authorization: Basic YWRtaW46
@@ -450,14 +598,14 @@ Once a schema has been defined, the posted records must match it:
         "code": 400,
         "details": [
             {
-                "description": "u'title' is a required property",
+                "description": "'title' is a required property",
                 "location": "body",
                 "name": "title"
             }
         ],
         "errno": 107,
         "error": "Invalid parameters",
-        "message": "u'title' is a required property"
+        "message": "'title' is a required property"
     }
 
 
@@ -475,7 +623,7 @@ It becomes possible to use this ``schema`` field as a filter on the collection
 records endpoint in order to obtain the records that were not validated against a particular
 version of the schema.
 
-For example, ``GET /buckets/default/collections/articles/records?min_schema=123456``.
+For example, ``GET /buckets/blog/collections/articles/records?min_schema=123456``.
 
 
 Remove a schema
@@ -489,11 +637,11 @@ to an empty mapping.
 
 .. code-block:: bash
 
-    echo '{"data": {"schema": {}} }' | http PATCH "http://localhost:8888/v1/buckets/default/collections/articles" --auth token:admin-token --verbose
+    echo '{"data": {"schema": {}} }' | http PATCH "http://localhost:8888/v1/buckets/blog/collections/articles" --auth token:admin-token --verbose
 
 .. code-block:: http
 
-    PATCH /v1/buckets/default/collections/articles HTTP/1.1
+    PATCH /v1/buckets/blog/collections/articles HTTP/1.1
     Accept: application/json
     Accept-Encoding: gzip, deflate
     Authorization: Basic YWRtaW46
@@ -550,13 +698,13 @@ For example, set it to ``3600`` (1 hour):
 
 .. code-block:: bash
 
-    echo '{"data": {"cache_expires": 3600} }' | http PATCH "http://localhost:8888/v1/buckets/default/collections/articles" --auth token:admin-token
+    echo '{"data": {"cache_expires": 3600} }' | http PATCH "http://localhost:8888/v1/buckets/blog/collections/articles" --auth token:admin-token
 
 From now on, the cache control headers are set for the `GET` requests:
 
 .. code-block:: bash
 
-    http  "http://localhost:8888/v1/buckets/default/collections/articles/records" --auth token:admin-token
+    http  "http://localhost:8888/v1/buckets/blog/collections/articles/records" --auth token:admin-token
 
 .. code-block:: http
     :emphasize-lines: 3,8
@@ -574,7 +722,7 @@ From now on, the cache control headers are set for the `GET` requests:
     Total-Records: 0
 
     {
-        "data": [...]
+        "data": [{}]
     }
 
 
@@ -582,7 +730,7 @@ If set to ``0``, the collection records become explicitly uncacheable (``no-cach
 
 .. code-block:: bash
 
-    echo '{"data": {"cache_expires": 0} }' | http PATCH "http://localhost:8888/v1/buckets/default/collections/articles" --auth token:admin-token
+    echo '{"data": {"cache_expires": 0} }' | http PATCH "http://localhost:8888/v1/buckets/blog/collections/articles" --auth token:admin-token
 
 .. code-block:: http
     :emphasize-lines: 3,8,10

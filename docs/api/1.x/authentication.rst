@@ -67,13 +67,16 @@ which computes a user id based on the token provided in the request.
 
 .. warning::
 
-    This method has many limitations but has the advantage to avoid
-    specific setup or third-party services to get started immediately.
+    This method has many limitations but has the advantage of not needing
+    specific setup or third-party services before you get started.
 
 When using arbitrary tokens make sure that:
 
  - each user has a different one;
  - a user always uses the same token.
+
+You can check if Basic Auth is enabled on the server side by checking
+the ``basicauth`` capability.
 
 
 How to Authenticate with Basic Auth?
@@ -92,12 +95,12 @@ Since any string is accepted, here we use ``token`` only by convention.
 Empty secrets are accepted and can be anything (custom, UUID, etc.)
 
 If the header has an invalid format, or if *Basic Auth* is not enabled,
-this will result in a ``401`` error response.
+this will result in a |status-401| error response.
 
 .. warning::
 
     Since :term:`user id` is derived from the token, there is no way
-    to change the token without «loosing» permissions on existing records.
+    to change the token without "losing" permissions on existing records.
     See below for more information.
 
 
@@ -107,6 +110,9 @@ How does Kinto know it is a valid Basic Auth token?
 For each token, Kinto will calculate a unique user ID which is
 related to your Kinto instance. It uses a bit of cryptography and the value of
 the ``user_hmac_secret`` setting.
+
+In other words, every string provided in the *Basic Auth* header will be valid,
+and will lead to a unique user ID.
 
 .. note::
 
@@ -131,15 +137,13 @@ You can obtain the :term:`user ID` generated for your token on the :ref:`Kinto r
     Server: nginx
 
     {
-        "cliquet_protocol_version": "2",
         "http_api_version": "1.0",
-        "project_docs": "https://kinto.readthedocs.org/",
+        "project_docs": "https://kinto.readthedocs.io/",
         "project_name": "kinto",
         "project_version": "1.10.0",
         "settings": {
             "attachment.base_url": "https://kinto.dev.mozaws.net/attachments/",
             "batch_max_requests": 25,
-            "cliquet.batch_max_requests": 25,
             "readonly": false
         },
         "url": "https://kinto.dev.mozaws.net/v1/",
@@ -215,7 +219,7 @@ Some possible strategies:
 
 - Most likely, you would use an identity provider which will be in
   charge of user and token management (generate, refresh, validate, ...).
-  `See this example with Django <http://django-oauth-toolkit.readthedocs.org/en/latest/tutorial/tutorial_01.html>`_.
+  `See this example with Django <https://django-oauth-toolkit.readthedocs.io/en/latest/tutorial/tutorial_01.html>`_.
 
 You can also read our :ref:`tutorial about how to plug the Github authorisation backend <tutorial-github>`.
 
@@ -235,11 +239,11 @@ The policy will verify the provided *OAuth2 bearer token* on a remote server.
 
 :notes:
 
-    If the token is not valid, this will result in a ``401`` error response.
+    If the token is not valid, this will result in a |status-401| error response.
 
 
 Firefox Accounts
 ----------------
 
 In order to enable authentication with :term:`Firefox Accounts`, install and
-configure :github:`mozilla-services/cliquet-fxa`.
+configure :github:`mozilla-services/kinto-fxa`.

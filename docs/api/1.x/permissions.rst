@@ -27,7 +27,9 @@ On each kind of object the set of permissions can be:
 
 In the case of a creation, since an object can have several kinds of children, the
 permission is prefixed by the type of child (for instance ``group:create``,
-``collection:create``).
+``collection:create``). When a user is allowed to create a child, she is allowed
+to read the parent attributes as well as listing accessible objects via the
+plural endpoint.
 
 The following table lists all permissions that can be associated to each kind
 of object.
@@ -35,20 +37,23 @@ of object.
 +----------------+------------------------+----------------------------------+
 | Object         | Associated permissions | Description                      |
 +================+========================+==================================+
-| Configuration  | ``bucket:create``      | Create new buckets.              |
-|                |                        |                                  |
+| Configuration  | ``bucket:create``      | Create new buckets and list      |
+|                |                        | existing buckets.                |
 +----------------+------------------------+----------------------------------+
 | Bucket         | ``read``               | Read all objects in the bucket.  |
-|                |                        |                                  |
 |                +------------------------+----------------------------------+
 |                | ``write``              | Write + read on the              |
 |                |                        | bucket and all children objects. |
 |                +------------------------+----------------------------------+
 |                | ``collection:create``  | Create new                       |
-|                |                        | collections in the bucket.       |
+|                |                        | collections in the bucket,       |
+|                |                        | list accessible collections      |
+|                |                        | and read bucket metadata.        |
 |                +------------------------+----------------------------------+
 |                | ``group:create``       | Create new groups                |
-|                |                        | in the bucket.                   |
+|                |                        | in the bucket,                   |
+|                |                        | list accessible groups           |
+|                |                        | and read bucket metadata.        |
 +----------------+------------------------+----------------------------------+
 | Collection     | ``read``               | Read all                         |
 |                |                        | objects in the collection.       |
@@ -57,7 +62,9 @@ of object.
 |                |                        | the collection.                  |
 |                +------------------------+----------------------------------+
 |                | ``record:create``      | Create new records               |
-|                |                        | in the collection.               |
+|                |                        | in the collection,               |
+|                |                        | list accessible records          |
+|                |                        | and read collection metadata.    |
 +----------------+------------------------+----------------------------------+
 | Record         | ``read``               | Read the record.                 |
 |                |                        | record.                          |
@@ -72,8 +79,10 @@ of object.
 |                |                        |                                  |
 +----------------+------------------------+----------------------------------+
 
-Every modification of an object (including the creation of new objects)
-grant the `write` permission to their creator.
+.. important::
+
+    Every modification of an object (including the creation of new objects)
+    grant the ``write`` permission to their creator/editor.
 
 
 .. note::
@@ -81,6 +90,7 @@ grant the `write` permission to their creator.
   There is no ``delete`` permission. Anyone with the ``write`` permission on an
   object can delete it.
 
+.. _api-principals:
 
 Principals
 ==========
@@ -90,6 +100,7 @@ authenticated *user* will be bound to to the request.
 
 The main principal is considered the **user ID** and follows this formalism:
 ``{type}:{identifier}`` (e.g. for Firefox Account: ``fxa:32aa95a474c984d41d395e2d0b614aa2``).
+When a users are added to :ref:`a group <groups>`, they receive a principal.
 
 There are two special principals:
 
@@ -97,20 +108,29 @@ There are two special principals:
 - ``system.Everyone``: Anyone (authenticated or anonymous). Using this
   principal is useful when a rule should apply to all users.
 
+Those principals are used in the permissions definitions. For example, to give
+the permission to read for everyone and to write for the *friends* group, the
+definition is ``read: ["system.Everyone"], write: ["/buckets/pictures/groups/friends"]``.
+
 .. note::
 
-    A user can also be another application (in order to provide *service to
+    A principal can also be another application (in order to provide *service to
     service* authentication).
+
+.. _api-current-userid:
 
 Get the current user ID
 -----------------------
 
 The currently authenticated *user ID* can be obtained on the root URL.
 
-.. code-block:: http
-    :emphasize-lines: 17
+.. code-block:: bash
 
     $ http GET http://localhost:8888/v1/ --auth token:my-secret
+
+.. code-block:: http
+    :emphasize-lines: 16
+
     HTTP/1.1 200 OK
     Access-Control-Expose-Headers: Backoff, Retry-After, Alert, Content-Length
     Content-Length: 288
@@ -119,7 +139,7 @@ The currently authenticated *user ID* can be obtained on the root URL.
     Server: waitress
 
     {
-        "documentation": "https://kinto.readthedocs.org/",
+        "documentation": "https://kinto.readthedocs.io/",
         "hello": "cloud storage",
         "settings": {
             "kinto.batch_max_requests": 25
@@ -140,9 +160,47 @@ In this case the user ID is: ``basicauth:631c2d625ee5726172cf67c6750de10a3e1a04b
     user ID - this is an easy way to obtain that ID.
 
 
+.. _api-permissions-payload:
 
-Retrieve permissions
-====================
+Permissions request payload
+===========================
+
+If the current user has the ``write`` permission on the object, the permissions
+are returned in the ``permissions`` attribute  along the ``data`` attribute
+in the JSON requests payloads.
+
+Permissions can be replaced or modified independently from data.
+
+``permissions`` is a JSON dict with the following structure::
+
+    "permissions": {<permission>: [<list_of_principals>]}
+
+Where ``<permission>`` is the permission name (e.g. ``read``, ``write``)
+and ``<list_of_principals>`` should be replaced by an actual list of
+:term:`principals`.
+
+Example:
+
+::
+
+    {
+        "data": {
+            "title": "No Backend"
+        },
+        "permissions": {
+            "write": ["twitter:leplatrem", "group:ldap:42"],
+            "read": ["system.Authenticated"]
+        }
+    }
+
+.. note::
+
+    When an object is created or modified, the current :term:`user id`
+    **is always added** among the ``write`` principals.
+
+
+Retrieve objects permissions
+============================
 
 .. http:get:: /(object url)
 
@@ -193,12 +251,24 @@ Retrieve permissions
         }
 
 
-Add a permission
-================
+Modify object permissions
+=========================
+
+An object's permissions can be modified at the same time as the object
+itself, using the same :ref:`PATCH <record-patch>` and :ref:`PUT
+<record-put>` methods discussed in :ref:`the Records section
+<records>`.
+
+.. note::
+
+   The user ID that updates *any* permissions is always added to the ``write``
+   permission list. This is in order to prevent accidental loss of ownership on an
+   object.
+
 
 .. http:patch:: /(object url)
 
-    :synopsis: Add principals or permissions to the object.
+    :synopsis: Modify the set of principals granted permissions on the object.
 
     **Requires authentication**
 
@@ -260,16 +330,6 @@ Add a permission
         }
 
 
-Replace or remove permissions
-=============================
-
-.. note::
-
-   The user ID that *updates* the permissions is always granted the `write`
-   permission. This is in order to prevent accidental loss of ownership on an
-   object.
-
-
 .. http:put:: /(object url)
 
     :synopsis: Replace existing principals or permissions of the object.
@@ -325,10 +385,97 @@ Replace or remove permissions
             },
             "permissions": {
                 "write": [
-                    "groups:writers"
-                ],
-                "write": [
+                    "groups:writers",
                     "basicauth:206691a25679e4e1135f16aa77ebcf211c767393c4306cfffe6cc228ac0886b6"
                 ]
             }
         }
+
+
+List every permissions
+======================
+
+**Requires setting** ``kinto.experimental_permissions_endpoint`` to ``True``.
+
+
+.. http:get:: /permissions
+
+    :synopsis: Retrieve the list of permissions granted on every kind of objects.
+
+    **Optional authentication**
+
+    **Example request**
+
+    .. sourcecode:: bash
+
+        $ http GET https://kinto.dev.mozaws.net/v1/permissions --auth token:bob-token
+
+    .. sourcecode:: http
+
+        GET /v1/permissions HTTP/1.1
+        Accept: */*
+        Accept-Encoding: gzip, deflate
+        Authorization: Basic Ym9iOg==
+        Connection: keep-alive
+        Host: localhost:8888
+        User-Agent: HTTPie/0.9.2
+
+    **Example response**
+
+    .. sourcecode:: http
+
+        HTTP/1.1 200 OK
+        Content-Length: 487
+        Content-Type: application/json; charset=UTF-8
+        Date: Wed, 15 Jun 2016 16:00:22 GMT
+        Server: waitress
+
+        {
+            "data": [
+                {
+                    "bucket_id": "2f9b1aaa-552d-48e8-1b78-371dd08688b3",
+                    "collection_id": "test",
+                    "id": "test",
+                    "permissions": [
+                        "write",
+                        "read",
+                        "record:create"
+                    ],
+                    "resource_name": "collection",
+                    "uri": "/buckets/2f9b1aaa-552d-48e8-1b78-371dd08688b3/collections/test"
+                },
+                {
+                    "bucket_id": "2f9b1aaa-552d-48e8-1b78-371dd08688b3",
+                    "id": "2f9b1aaa-552d-48e8-1b78-371dd08688b3",
+                    "permissions": [
+                        "write",
+                        "read",
+                        "collection:create",
+                        "group:create"
+                    ],
+                    "resource_name": "bucket",
+                    "uri": "/buckets/2f9b1aaa-552d-48e8-1b78-371dd08688b3"
+                }
+            ]
+        }
+
+.. important::
+
+    The inherited objects are not expanded. This means that if the current user
+    has some permissions on a bucket, the sub-objects like collections, groups
+    and records won't be explicitly listed.
+
+
+List of available URL parameters
+--------------------------------
+
+- ``<prefix?><field name>``: :doc:`filter <filtering>` by value(s)
+- ``_sort``: :doc:`order list <sorting>`
+- ``_limit``: :doc:`pagination max size <pagination>`
+- ``_token``: :doc:`pagination token <pagination>`
+- ``_fields``: :doc:`filter the fields of the records <selecting_fields>`
+
+
+Filtering, sorting, partial responses and paginating can all be combined together.
+
+* ``?_sort=-last_modified&_limit=100&_fields=title``

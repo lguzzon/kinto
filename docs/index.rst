@@ -1,9 +1,7 @@
-.. figure :: images/logo.svg
+.. figure :: images/kinto-logo.svg
     :align: center
 
-    **Kinto** — Store, Sync, Share, and Self-Host.
-
-Kinto is a lightweight JSON storage service with synchronisation and sharing
+Kinto is a minimalist JSON storage service with synchronisation and sharing
 abilities.
 
 Table of content
@@ -14,14 +12,16 @@ Table of content
 
    overview
    concepts
-   get-started
+   community
    tutorials/index
    configuration/index
    api/index
+   commandline
+   faq
    troubleshooting
-   contributing
    changelog
-   cliquet_glossary
+   core/glossary
+   core/index
 
 Indices and tables
 ==================

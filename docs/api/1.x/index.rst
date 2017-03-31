@@ -1,7 +1,38 @@
 .. _kinto-api-endpoints:
 
-1.1
+1.x
 ###
+
+Full reference
+==============
+
+Full detailed API documentation:
+
+.. toctree::
+   :maxdepth: 1
+
+   authentication
+   buckets
+   collections
+   records
+   groups
+   permissions
+   filtering
+   sorting
+   pagination
+   selecting_fields
+   history
+   quotas
+   accounts
+   utilities
+   batch
+   openapi
+   flush
+   timestamps
+   backoff
+   errors
+   deprecation
+
 
 Cheatsheet
 ==========
@@ -17,13 +48,20 @@ Cheatsheet
 | `GET`    | :ref:`/__heartbeat__ <api-utilities>`                                                        | :ref:`Return the status of dependent services           |
 |          |                                                                                              | <api-utilities>`                                        |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `GET`    | :ref:`/__api__ <openapi_spec>`                                                               | :ref:`Return the OpenAPI description of the running     |
+|          |                                                                                              | instance <openapi_spec>`                                |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | **Buckets**                                                                                                                                                       |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `POST`   | :ref:`/buckets <buckets-post>`                                                               | :ref:`Create a bucket <buckets-post>`                   |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `GET`    | :ref:`/buckets <buckets-get>`                                                                | :ref:`List buckets <buckets-get>`                       |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `DELETE` | :ref:`/buckets <buckets-delete>`                                                             | :ref:`Delete every writable buckets <buckets-delete>`   |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `PUT`    | :ref:`/buckets/(bucket_id) <bucket-put>`                                                     | :ref:`Create or replace a bucket <bucket-put>`          |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `PATCH`  | :ref:`/buckets/(bucket_id) <bucket-patch>`                                                   | :ref:`Modify an existing bucket <bucket-patch>`         |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `GET`    | :ref:`/buckets/(bucket_id) <bucket-get>`                                                     | :ref:`Retrieve an existing bucket <bucket-get>`         |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
@@ -35,7 +73,11 @@ Cheatsheet
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `GET`    | :ref:`/buckets/(bucket_id)/groups <groups-get>`                                              | :ref:`Retrieve the list of bucket's group <groups-get>` |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `DELETE` | :ref:`/buckets/(bucket_id)/groups <groups-delete>`                                           | :ref:`Delete writable groups <groups-delete>`           |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `PUT`    | :ref:`/buckets/(bucket_id)/groups/(group_id) <group-put>`                                    | :ref:`Update a group <group-put>`                       |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `PATCH`  | :ref:`/buckets/(bucket_id)/groups/(group_id) <group-patch>`                                  | :ref:`Modify an existing group <group-patch>`           |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `GET`    | :ref:`/buckets/(bucket_id)/groups/(group_id) <group-get>`                                    | :ref:`Retrieve a group <group-get>`                     |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
@@ -43,11 +85,15 @@ Cheatsheet
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | **Collections**                                                                                                                                                   |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
-| `POST`   | :ref:`/buckets/(bucket_id)/collections <collection-post>`                                    | :ref:`Create a collection <collection-put>`             |
+| `GET`    | :ref:`/buckets/(bucket_id)/collections <collections-get>`                                    | :ref:`List bucket's collections <collections-get>`      |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `DELETE` | :ref:`/buckets/(bucket_id)/collections <collections-delete>`                                 | :ref:`Delete writable collections <collections-delete>` |
++----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
+| `POST`   | :ref:`/buckets/(bucket_id)/collections <collections-post>`                                   | :ref:`Create a collection <collections-post>`           |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `PUT`    | :ref:`/buckets/(bucket_id)/collections/(collection_id) <collection-put>`                     | :ref:`Create or replace a collection <collection-put>`  |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
-| `PATCH`  | :ref:`/buckets/(bucket_id)/collections/(collection_id) <collection-patch>`                   | :ref:`Update a collection <collection-patch>`           |
+| `PATCH`  | :ref:`/buckets/(bucket_id)/collections/(collection_id) <collection-patch>`                   | :ref:`Modify an existing collection <collection-patch>` |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `GET`    | :ref:`/buckets/(bucket_id)/collections/(collection_id) <collection-get>`                     | :ref:`Retreive an existing collection <collection-get>` |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
@@ -61,39 +107,11 @@ Cheatsheet
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `DELETE` | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records <records-delete>`             | :ref:`Delete stored records <records-delete>`           |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
-| `PUT`    | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records/(record_id) <record-put>`     | :ref:`Replace a record <record-put>`                    |
+| `PUT`    | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records/(record_id) <record-put>`     | :ref:`Create or replace a record <record-put>`          |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
-| `PATCH`  | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records/(record_id) <record-patch>`   | :ref:`Update a record <record-patch>`                   |
+| `PATCH`  | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records/(record_id) <record-patch>`   | :ref:`Modify an existing record <record-patch>`         |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `GET`    | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records/(record_id) <records-get>`    | :ref:`Retrieve a single record <records-get>`           |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
 | `DELETE` | :ref:`/buckets/(bucket_id)/collections/(collection_id)/records/(record_id) <record-delete>`  | :ref:`Delete a single record <record-delete>`           |
 +----------+----------------------------------------------------------------------------------------------+---------------------------------------------------------+
-
-Buckets, Groups, Collection and Record endpoints are *resource endpoints* which
-can be filtered, paginated, and interacted with as described in
-:ref:`resource-endpoints`.
-
-
-Full reference
-==============
-
-Full detailed API documentation:
-
-.. toctree::
-   :maxdepth: 2
-
-   cliquet/utilities
-   authentication
-   cliquet/batch
-   cliquet/timestamps
-   cliquet/backoff
-   cliquet/errors
-   cliquet/deprecation
-   buckets
-   collections
-   records
-   groups
-   permissions
-   synchronisation
-   cliquet/resource

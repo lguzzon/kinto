@@ -1,7 +1,7 @@
-from cliquet import authorization as cliquet_authorization
 from pyramid.security import IAuthorizationPolicy
 from zope.interface import implementer
 
+from kinto.core import authorization as core_authorization
 
 # Vocab really matters when you deal with permissions. Let's do a quick recap
 # of the terms used here:
@@ -22,127 +22,144 @@ from zope.interface import implementer
 
 # Dictionary which list all permissions a given permission enables.
 PERMISSIONS_INHERITANCE_TREE = {
-    'bucket:write': {
-        'bucket': ['write']
+    '': {  # Granted via settings only.
+        'bucket:create': {},
+        'write': {},
+        'read': {},
     },
-    'bucket:read': {
-        'bucket': ['write', 'read']
+    'bucket': {
+        'write': {
+            'bucket': ['write']
+        },
+        'read': {
+            'bucket': ['write', 'read'],
+        },
+        'read:attributes': {
+            'bucket': ['write', 'read', 'collection:create', 'group:create']
+        },
+        'group:create': {
+            'bucket': ['write', 'group:create']
+        },
+        'collection:create': {
+            'bucket': ['write', 'collection:create']
+        },
     },
-    'bucket:group:create': {
-        'bucket': ['write', 'group:create']
+    'group': {
+        'write': {
+            'bucket': ['write'],
+            'group': ['write']
+        },
+        'read': {
+            'bucket': ['write', 'read'],
+            'group': ['write', 'read']
+        },
     },
-    'bucket:collection:create': {
-        'bucket': ['write', 'collection:create']
+    'collection': {
+        'write': {
+            'bucket': ['write'],
+            'collection': ['write'],
+        },
+        'read': {
+            'bucket': ['write', 'read'],
+            'collection': ['write', 'read'],
+        },
+        'read:attributes': {
+            'bucket': ['write', 'read'],
+            'collection': ['write', 'read', 'record:create'],
+        },
+        'record:create': {
+            'bucket': ['write'],
+            'collection': ['write', 'record:create']
+        },
     },
-    'group:write': {
-        'bucket': ['write'],
-        'group': ['write']
-    },
-    'group:read': {
-        'bucket': ['write', 'read'],
-        'group': ['write', 'read']
-    },
-    'collection:write': {
-        'bucket': ['write'],
-        'collection': ['write'],
-    },
-    'collection:read': {
-        'bucket': ['write', 'read'],
-        'collection': ['write', 'read'],
-    },
-    'collection:record:create': {
-        'bucket': ['write'],
-        'collection': ['write', 'record:create']
-    },
-    'record:write': {
-        'bucket': ['write'],
-        'collection': ['write'],
-        'record': ['write']
-    },
-    'record:read': {
-        'bucket': ['write', 'read'],
-        'collection': ['write', 'read'],
-        'record': ['write', 'read']
+    'record': {
+        'write': {
+            'bucket': ['write'],
+            'collection': ['write'],
+            'record': ['write']
+        },
+        'read': {
+            'bucket': ['write', 'read'],
+            'collection': ['write', 'read'],
+            'record': ['write', 'read']
+        },
     }
 }
 
 
-def get_object_type(object_uri):
-    """Return the type of an object from its id."""
-
+def _resource_endpoint(object_uri):
+    """Determine the resource name and whether it is the plural endpoint from
+    the specified `object_uri`. Returns `(None, None)` for the root URL plural
+    endpoint.
+    """
     obj_parts = object_uri.split('/')
-    if len(obj_parts) % 2 == 0:
-        object_uri = '/'.join(obj_parts[:-1])
+    plural_endpoint = len(obj_parts) % 2 == 0
+    if plural_endpoint:
+        # /buckets/bid/collections -> /buckets/bid
+        obj_parts = obj_parts[:-1]
 
-    # Order matters here. More precise is tested first.
-    if 'records' in object_uri:
-        obj_type = 'record'
-    elif 'collections' in object_uri:
-        obj_type = 'collection'
-    elif 'groups' in object_uri:
-        obj_type = 'group'
-    elif 'buckets' in object_uri:
-        obj_type = 'bucket'
-    else:
-        obj_type = None
-    return obj_type
+    if len(obj_parts) <= 2:
+        # Root URL /buckets -> ('', False)
+        return '', False
 
-
-def build_permission_tuple(obj_type, unbound_permission, obj_parts):
-    """Returns a tuple of (object_uri, unbound_permission)"""
-    PARTS_LENGTH = {
-        'bucket': 3,
-        'collection': 5,
-        'group': 5,
-        'record': 7
-    }
-    if obj_type not in PARTS_LENGTH:
-        raise ValueError('Invalid object type: %s' % obj_type)
-
-    if PARTS_LENGTH[obj_type] > len(obj_parts):
-        raise ValueError('You cannot build children keys from its parent key.'
-                         'Trying to build type "%s" from object key "%s".' % (
-                             obj_type, '/'.join(obj_parts)))
-    length = PARTS_LENGTH[obj_type]
-    return ('/'.join(obj_parts[:length]), unbound_permission)
+    # /buckets/bid -> buckets
+    resource_name = obj_parts[-2]
+    # buckets -> bucket
+    resource_name = resource_name.rstrip('s')
+    return resource_name, plural_endpoint
 
 
-def build_permissions_set(object_uri, unbound_permission,
-                          inheritance_tree=None):
-    """Build a set of all permissions that can grant access to the given
-    object URI and unbound permission.
+def _relative_object_uri(resource_name, object_uri):
+    """Returns object_uri
+    """
+    obj_parts = object_uri.split('/')
+    for length in range(len(obj_parts) + 1):
+        parent_uri = '/'.join(obj_parts[:length])
+        parent_resource_name, _ = _resource_endpoint(parent_uri)
+        if resource_name == parent_resource_name:
+            return parent_uri
 
-    >>> build_required_permissions('/buckets/blog', 'write')
-    set(('/buckets/blog', 'write'))
+    error_msg = "Cannot get URL of resource '{}' from parent '{}'."
+    raise ValueError(error_msg.format(resource_name, object_uri))
+
+
+def _inherited_permissions(object_uri, permission):
+    """Build the list of all permissions that can grant access to the given
+    object URI and permission.
+
+    >>> _inherited_permissions('/buckets/blog/collections/article', 'read')
+    [('/buckets/blog/collections/article', 'write'),
+     ('/buckets/blog/collections/article', 'read'),
+     ('/buckets/blog', 'write'),
+     ('/buckets/blog', 'read')]
 
     """
+    resource_name, plural = _resource_endpoint(object_uri)
+    try:
+        object_perms_tree = PERMISSIONS_INHERITANCE_TREE[resource_name]
+    except KeyError:
+        return []  # URL that are not resources have no inherited perms.
 
-    if inheritance_tree is None:
-        inheritance_tree = PERMISSIONS_INHERITANCE_TREE
+    # When requesting permissions for a single object, we check if they are any
+    # specific inherited permissions for the attributes.
+    attributes_permission = '{}:attributes'.format(permission) if not plural else permission
+    inherited_perms = object_perms_tree.get(attributes_permission, object_perms_tree[permission])
 
-    obj_type = get_object_type(object_uri)
-
-    # Unknown object type, does not map the INHERITANCE_TREE.
-    # In that case, the set of related permissions is empty.
-    if obj_type is None:
-        return set()
-
-    bound_permission = '%s:%s' % (obj_type, unbound_permission)
     granters = set()
+    for related_resource_name, implicit_permissions in inherited_perms.items():
+        for permission in implicit_permissions:
+            related_uri = _relative_object_uri(related_resource_name, object_uri)
+            granters.add((related_uri, permission))
 
-    obj_parts = object_uri.split('/')
-    for obj, permission_list in inheritance_tree[bound_permission].items():
-        for permission in permission_list:
-            granters.add(build_permission_tuple(obj, permission, obj_parts))
-
-    return granters
+    # Sort by ascending URLs.
+    return sorted(granters, key=lambda uri_perm: len(uri_perm[0]), reverse=True)
 
 
 @implementer(IAuthorizationPolicy)
-class AuthorizationPolicy(cliquet_authorization.AuthorizationPolicy):
+class AuthorizationPolicy(core_authorization.AuthorizationPolicy):
     def get_bound_permissions(self, *args, **kwargs):
-        return build_permissions_set(*args, **kwargs)
+        return _inherited_permissions(*args, **kwargs)
 
 
-class RouteFactory(cliquet_authorization.RouteFactory):
+class RouteFactory(core_authorization.RouteFactory):
     pass

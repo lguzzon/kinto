@@ -1,49 +1,39 @@
-from cliquet import resource
-from kinto.views import NameGenerator
+from kinto.core import resource
+from kinto.core.utils import instance_uri
+from kinto.core.events import ResourceChanged, ACTIONS
+from pyramid.events import subscriber
 
 
 @resource.register(name='bucket',
-                   collection_methods=('GET', 'POST'),
                    collection_path='/buckets',
                    record_path='/buckets/{{id}}')
-class Bucket(resource.ProtectedResource):
+class Bucket(resource.ShareableResource):
     permissions = ('read', 'write', 'collection:create', 'group:create')
 
-    def __init__(self, *args, **kwargs):
-        super(Bucket, self).__init__(*args, **kwargs)
-        self.model.id_generator = NameGenerator()
-
     def get_parent_id(self, request):
-        # Buckets are not isolated by user, unlike Cliquet resources.
+        # Buckets are not isolated by user, unlike Kinto-Core resources.
         return ''
 
-    def delete(self):
-        result = super(Bucket, self).delete()
 
-        # Delete groups.
-        storage = self.model.storage
-        parent_id = '/buckets/%s' % self.record_id
-        storage.delete_all(collection_id='group',
-                           parent_id=parent_id,
+@subscriber(ResourceChanged,
+            for_resources=('bucket',),
+            for_actions=(ACTIONS.DELETE,))
+def on_buckets_deleted(event):
+    """Some buckets were deleted, delete sub-resources.
+    """
+    storage = event.request.registry.storage
+    permission = event.request.registry.permission
+
+    for change in event.impacted_records:
+        bucket = change['old']
+        bucket_uri = instance_uri(event.request, 'bucket', id=bucket['id'])
+        # Delete everything whose parent_id starts with bucket_uri.
+        parent_pattern = bucket_uri + '*'
+        storage.delete_all(parent_id=parent_pattern,
+                           collection_id=None,
                            with_deleted=False)
-        storage.purge_deleted(collection_id='group',
-                              parent_id=parent_id)
-
-        # Delete collections.
-        deleted = storage.delete_all(collection_id='collection',
-                                     parent_id=parent_id,
-                                     with_deleted=False)
-        storage.purge_deleted(collection_id='collection',
-                              parent_id=parent_id)
-
-        # Delete records.
-        id_field = self.model.id_field
-        for collection in deleted:
-            parent_id = '/buckets/%s/collections/%s' % (self.record_id,
-                                                        collection[id_field])
-            storage.delete_all(collection_id='record',
-                               parent_id=parent_id,
-                               with_deleted=False)
-            storage.purge_deleted(collection_id='record', parent_id=parent_id)
-
-        return result
+        # Remove remaining tombstones too.
+        storage.purge_deleted(parent_id=parent_pattern,
+                              collection_id=None)
+        # Remove related permissions
+        permission.delete_object_permissions(parent_pattern)

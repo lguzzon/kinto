@@ -85,7 +85,7 @@ It is a wrapper basically, and the code is kept simple for the simplicity of thi
 
     import elasticsearch
 
-    class Indexer(object):
+    class Indexer:
         def __init__(self, hosts):
             self.client = elasticsearch.Elasticsearch(hosts)
 
@@ -155,7 +155,11 @@ Add an endpoint definition in :file:`kinto_elasticsearch/views.py`:
 
 .. code-block:: python
 
-    from cliquet import Service, logger
+    import logging
+
+    from kinto.core import Service
+
+    logger = logging.getLogger(__name__)
 
     search = Service(name="search",
                      path='/buckets/{bucket_id}/collections/{collection_id}/search',
@@ -242,12 +246,12 @@ an action is performed on records.
                                      collection_id,
                                      record=change['new'])
 
-And then we bind this function with the *Cliquet* events (the toolkit used by Kinto):
+And then we bind this function with the *Kinto-Core* events:
 
 .. code-block:: python
     :emphasize-lines: 1,12,13
 
-    from cliquet.events import ResourceChanged
+    from kinto.core.events import ResourceChanged
 
     from . import indexer
 
@@ -261,6 +265,82 @@ And then we bind this function with the *Cliquet* events (the toolkit used by Ki
         # Plug the callback with resource events.
         config.add_subscriber(on_resource_changed, ResourceChanged)
 
+
+Declare API capabilities
+------------------------
+
+Arbitrary capabilities can be declared and exposed in the :ref:`root URL <api-utilities>`.
+
+Clients can rely on this to detect optional features on the server, like our indexer!
+
+
+.. code-block:: python
+    :emphasize-lines: 14-17
+
+    from kinto.core.events import ResourceChanged
+
+    from . import indexer
+
+    def includeme(config):
+        # Register a global indexer object
+        config.registry.indexer = indexer.load_from_config(config)
+
+        # Activate end-points.
+        config.scan('kinto_elasticsearch.views')
+
+        # Plug the callback with resource events.
+        config.add_subscriber(on_resource_changed, ResourceChanged)
+
+        config.add_api_capability("indexed_search",
+                                  description="Search records using ElasticSearch",
+                                  url="https://my-super-indexer-for-kinto.org")
+
+.. note::
+
+    Any argument passed to ``config.add_api_capability()`` will be exposed in the
+    root URL.
+
+
+Default configuration and environment variables
+-----------------------------------------------
+
+A helper allows to read configuration values from :ref:`environment variables <configuration-environment>`
+and provide default values.
+
+
+.. code-block:: python
+    :emphasize-lines: 1,6-8,11,12
+
+    from kinto.core import load_default_settings
+    from kinto.core.events import ResourceChanged
+
+    from . import indexer
+
+    DEFAULT_SETTINGS = {
+        'elasticsearch.refresh_enabled': False
+    }
+
+    def includeme(config):
+        # Load settings from environment and apply defaults.
+        load_default_settings(config, DEFAULT_SETTINGS)
+
+        # Register a global indexer object
+        config.registry.indexer = indexer.load_from_config(config)
+
+        # Activate end-points.
+        config.scan('kinto_elasticsearch.views')
+
+        # Plug the callback with resource events.
+        config.add_subscriber(on_resource_changed, ResourceChanged)
+
+        config.add_api_capability("indexed_search",
+                                  description="Search records using ElasticSearch",
+                                  url="https://my-super-indexer-for-kinto.org")
+
+
+In this example, if the environment variable ``KINTO_ELASTICSEARCH_REFRESH_ENABLED``
+is set to ``true``, it will override the setting ``kinto.elasticsearch.refresh_enabled`` from the ``.ini``
+file.
 
 
 Test it altogether
@@ -337,3 +417,9 @@ plugin, it would require:
 * Delete the index when the bucket or collection are deleted
 
 If you feel like doing it, we would be very glad to help you!
+
+
+More documentation
+------------------
+
+Some more details about Kinto internals are given in the :ref:`Kinto core docs <kinto-core>`!

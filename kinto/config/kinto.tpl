@@ -1,7 +1,11 @@
+# Created at {config_file_timestamp}
+# Using Kinto version {kinto_version}
+
+
 [server:main]
 use = egg:waitress#main
-host = 0.0.0.0
-port = 8888
+host = {host}
+port = %(http_port)s
 
 
 [app:main]
@@ -10,28 +14,23 @@ use = egg:kinto
 #
 # Backends.
 #
-# http://kinto.readthedocs.org/en/latest/configuration/settings.html#storage
+# https://kinto.readthedocs.io/en/latest/configuration/settings.html#storage
 #
 kinto.storage_backend = {storage_backend}
 kinto.storage_url = {storage_url}
 kinto.cache_backend = {cache_backend}
 kinto.cache_url = {cache_url}
+# kinto.cache_max_size_bytes = 524288
 kinto.permission_backend = {permission_backend}
 kinto.permission_url = {permission_url}
 
 #
-# Auth configuration.
+# Features.
 #
-# http://kinto.readthedocs.org/en/latest/configuration/settings.html#authentication
-#
-kinto.userid_hmac_secret = {secret}
-multiauth.policies = basicauth
-# multiauth.policies = fxa basicauth
-
+# kinto.readonly = false
 # kinto.bucket_create_principals = system.Authenticated
 # kinto.batch_max_requests = 25
 
-#
 # Experimental JSON-schema on collection
 # kinto.experimental_collection_schema_validation = true
 
@@ -41,9 +40,32 @@ multiauth.policies = basicauth
 kinto.includes = kinto.plugins.default_bucket
 
 #
+# Auth configuration.
+#
+# https://kinto.readthedocs.io/en/latest/configuration/settings.html#authentication
+#
+kinto.userid_hmac_secret = {secret}
+multiauth.policies = basicauth
+# multiauth.policies = fxa basicauth
+
+#
+# Accounts API configuration.
+#
+# Enable built-in plugin.
+# kinto.includes = kinto.plugins.accounts
+# Enable authenticated policy.
+# multiauth.policies = account
+# multiauth.policy.account.use = kinto.plugins.accounts.authentication.AccountsAuthenticationPolicy
+# Allow anyone to create accounts.
+# kinto.account_create_principals = system.Everyone
+# Set user 'account:admin' as the administrator.
+# kinto.account_write_principals = account:admin
+# kinto.account_read_principals = account:admin
+
+#
 # Firefox Accounts configuration.
 #   These are working FxA credentials for localhost:8888
-# kinto.includes  = cliquet_fxa
+# kinto.includes  = kinto_fxa
 # fxa-oauth.client_id = 61c3f791f740c19a
 # fxa-oauth.client_secret = b13739d8a905315314b09fb7b947aaeb62b47c6a4a5efb00c378fdecacd1e95e
 # fxa-oauth.oauth_uri = https://oauth-stable.dev.lcip.org/v1
@@ -55,7 +77,7 @@ kinto.includes = kinto.plugins.default_bucket
 #
 # Client cache headers
 #
-# http://kinto.readthedocs.org/en/latest/configuration/settings.html#client-caching
+# https://kinto.readthedocs.io/en/latest/configuration/settings.html#client-caching
 #
 # Every bucket objects objects and list
 # kinto.bucket_cache_expires_seconds = 3600
@@ -78,8 +100,9 @@ kinto.includes = kinto.plugins.default_bucket
 #
 # Production settings
 #
-# http://kinto.readthedocs.org/en/latest/configuration/production.html
+# https://kinto.readthedocs.io/en/latest/configuration/production.html
 #
+# kinto.statsd_backend = kinto.core.statsd
 # kinto.statsd_url = udp://localhost:8125
 # kinto.statsd_prefix = kinto-prod
 
@@ -108,38 +131,36 @@ kinto.includes = kinto.plugins.default_bucket
 # single-interpreter = true
 # buffer-size = 65535
 # post-buffering = 65535
+# plugin = python
 
 
 #
 # Logging configuration
 #
 
-# kinto.logging_renderer = cliquet.logs.ClassicLogRenderer
-
 [loggers]
-keys = root, cliquet
+keys = root, kinto
 
 [handlers]
 keys = console
 
 [formatters]
-keys = generic
+keys = color
 
 [logger_root]
 level = INFO
 handlers = console
 
-[logger_cliquet]
+[logger_kinto]
 level = DEBUG
-handlers =
-qualname = cliquet
+handlers = console
+qualname = kinto
 
 [handler_console]
 class = StreamHandler
 args = (sys.stderr,)
 level = NOTSET
-formatter = generic
+formatter = color
 
-[formatter_generic]
-format = %(asctime)s %(levelname)-5.5s [%(name)s][%(threadName)s] %(message)s
-
+[formatter_color]
+class = logging_color_formatter.ColorFormatter

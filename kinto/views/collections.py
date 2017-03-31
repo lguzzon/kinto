@@ -1,9 +1,9 @@
 import colander
 import jsonschema
-from cliquet import resource
+from kinto.core import resource, utils
+from kinto.core.events import ResourceChanged, ACTIONS
 from jsonschema import exceptions as jsonschema_exceptions
-
-from kinto.views import NameGenerator
+from pyramid.events import subscriber
 
 
 class JSONSchemaMapping(colander.SchemaNode):
@@ -12,7 +12,7 @@ class JSONSchemaMapping(colander.SchemaNode):
 
     def deserialize(self, cstruct=colander.null):
         # Start by deserializing a simple mapping.
-        validated = super(JSONSchemaMapping, self).deserialize(cstruct)
+        validated = super().deserialize(cstruct)
 
         # In case it is optional in parent schema.
         if not validated or validated in (colander.null, colander.drop):
@@ -29,37 +29,38 @@ class CollectionSchema(resource.ResourceSchema):
     schema = JSONSchemaMapping(missing=colander.drop)
     cache_expires = colander.SchemaNode(colander.Int(), missing=colander.drop)
 
-    class Options:
-        preserve_unknown = True
-
 
 @resource.register(name='collection',
-                   collection_methods=('GET', 'POST'),
                    collection_path='/buckets/{{bucket_id}}/collections',
                    record_path='/buckets/{{bucket_id}}/collections/{{id}}')
-class Collection(resource.ProtectedResource):
-    mapping = CollectionSchema()
+class Collection(resource.ShareableResource):
+    schema = CollectionSchema
     permissions = ('read', 'write', 'record:create')
-
-    def __init__(self, *args, **kwargs):
-        super(Collection, self).__init__(*args, **kwargs)
-        self.model.id_generator = NameGenerator()
 
     def get_parent_id(self, request):
         bucket_id = request.matchdict['bucket_id']
-        parent_id = '/buckets/%s' % bucket_id
+        parent_id = utils.instance_uri(request, 'bucket', id=bucket_id)
         return parent_id
 
-    def delete(self):
-        result = super(Collection, self).delete()
 
-        # Delete records.
-        storage = self.model.storage
-        parent_id = '%s/collections/%s' % (self.model.parent_id,
-                                           self.record_id)
+@subscriber(ResourceChanged,
+            for_resources=('collection',),
+            for_actions=(ACTIONS.DELETE,))
+def on_collections_deleted(event):
+    """Some collections were deleted, delete records.
+    """
+    storage = event.request.registry.storage
+    permission = event.request.registry.permission
+
+    for change in event.impacted_records:
+        collection = change['old']
+        bucket_id = event.payload['bucket_id']
+        parent_id = utils.instance_uri(event.request, 'collection',
+                                       bucket_id=bucket_id,
+                                       id=collection['id'])
         storage.delete_all(collection_id='record',
                            parent_id=parent_id,
                            with_deleted=False)
-        storage.purge_deleted(collection_id='record', parent_id=parent_id)
-
-        return result
+        storage.purge_deleted(collection_id='record',
+                              parent_id=parent_id)
+        permission.delete_object_permissions(parent_id + '*')
